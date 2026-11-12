@@ -26,6 +26,13 @@ func escapeSQLString(value string) string {
 	return value
 }
 
+func containerNameCondition(containerName string) string {
+	if containerName == "" {
+		return ""
+	}
+	return colContainerName + " = '" + escapeSQLString(containerName) + "'"
+}
+
 // Pod label columns that place a log record on a component's release lines.
 const (
 	colComponentID   = "kubernetes_labels_openchoreo_dev_component_uid"
@@ -194,6 +201,9 @@ func generateComponentLogsCountQuery(params ComponentLogsParams, stream string, 
 	if params.EnvironmentID != "" {
 		conditions = append(conditions, "kubernetes_labels_openchoreo_dev_environment_uid = '"+escapeSQLString(params.EnvironmentID)+"'")
 	}
+	if condition := containerNameCondition(params.ContainerName); condition != "" {
+		conditions = append(conditions, condition)
+	}
 	conditions = append(conditions, releaseLineConditions(logReleaseLineFields, params.stored, params.ComponentIDs, params.ReleaseLineID, params.AllReleaseLines)...)
 	if params.SearchPhrase != "" {
 		conditions = append(conditions, "log LIKE '%"+escapeSQLString(params.SearchPhrase)+"%'")
@@ -240,6 +250,9 @@ func generateWorkflowLogsCountQuery(params WorkflowLogsParams, stream string, lo
 	}
 	if params.WorkflowRunName != "" {
 		conditions = append(conditions, "kubernetes_labels_workflows_argoproj_io_workflow = '"+escapeSQLString(params.WorkflowRunName)+"'")
+	}
+	if condition := containerNameCondition(params.ContainerName); condition != "" {
+		conditions = append(conditions, condition)
 	}
 	if params.SearchPhrase != "" {
 		conditions = append(conditions, "log LIKE '%"+escapeSQLString(params.SearchPhrase)+"%'")
@@ -365,6 +378,10 @@ func generateWorkflowLogsQuery(params WorkflowLogsParams, stream string, logger 
 		conditions = append(conditions, "kubernetes_labels_workflows_argoproj_io_workflow = '"+escapeSQLString(params.WorkflowRunName)+"'")
 	}
 
+	if condition := containerNameCondition(params.ContainerName); condition != "" {
+		conditions = append(conditions, condition)
+	}
+
 	// Add search phrase filter
 	if params.SearchPhrase != "" {
 		conditions = append(conditions, "log LIKE '%"+escapeSQLString(params.SearchPhrase)+"%'")
@@ -438,6 +455,10 @@ func generateComponentLogsQuery(params ComponentLogsParams, stream string, logge
 	// Add environment filter
 	if params.EnvironmentID != "" {
 		conditions = append(conditions, "kubernetes_labels_openchoreo_dev_environment_uid = '"+escapeSQLString(params.EnvironmentID)+"'")
+	}
+
+	if condition := containerNameCondition(params.ContainerName); condition != "" {
+		conditions = append(conditions, condition)
 	}
 
 	// Add optional component and release line filter

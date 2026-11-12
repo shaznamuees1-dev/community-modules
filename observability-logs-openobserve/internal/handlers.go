@@ -602,6 +602,9 @@ func toWorkflowLogsParams(req *gen.LogsQueryRequest, scope *gen.WorkflowSearchSc
 	if req.SearchPhrase != nil {
 		params.SearchPhrase = *req.SearchPhrase
 	}
+	if req.ContainerName != nil {
+		params.ContainerName = *req.ContainerName
+	}
 	if req.LogLevels != nil {
 		levels := make([]string, len(*req.LogLevels))
 		for i, l := range *req.LogLevels {
@@ -665,6 +668,9 @@ func toComponentLogsParams(req *gen.LogsQueryRequest, scope *gen.ComponentSearch
 	}
 	if req.SearchPhrase != nil {
 		params.SearchPhrase = *req.SearchPhrase
+	}
+	if req.ContainerName != nil {
+		params.ContainerName = *req.ContainerName
 	}
 	if req.LogLevels != nil {
 		levels := make([]string, len(*req.LogLevels))

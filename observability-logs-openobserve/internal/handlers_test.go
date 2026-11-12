@@ -97,8 +97,8 @@ func TestParseAlertWebhookBody(t *testing.T) {
 	t.Run("valid body with float count and microsecond timestamp", func(t *testing.T) {
 		ts := time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)
 		body := map[string]interface{}{
-			"alertName":                   "test-alert",
-			"alertCount":                  float64(5),
+			"alertName":                    "test-alert",
+			"alertCount":                   float64(5),
 			"alertTriggerTimeMicroSeconds": float64(ts.UnixMicro()),
 		}
 
@@ -123,8 +123,8 @@ func TestParseAlertWebhookBody(t *testing.T) {
 	t.Run("string count and string timestamp", func(t *testing.T) {
 		ts := time.UnixMicro(1750000200000000)
 		body := map[string]interface{}{
-			"alertName":                   "test-alert",
-			"alertCount":                  "3.14",
+			"alertName":                    "test-alert",
+			"alertCount":                   "3.14",
 			"alertTriggerTimeMicroSeconds": "1750000200000000",
 		}
 
@@ -173,7 +173,7 @@ func TestParseAlertWebhookBody(t *testing.T) {
 
 	t.Run("invalid string timestamp", func(t *testing.T) {
 		body := map[string]interface{}{
-			"alertName":                   "test",
+			"alertName":                    "test",
 			"alertTriggerTimeMicroSeconds": "not-a-number",
 		}
 		_, _, _, _, err := parseAlertWebhookBody(body)
@@ -204,18 +204,20 @@ func TestToComponentLogsParams(t *testing.T) {
 	limit := 50
 	sortOrder := gen.LogsQueryRequestSortOrder("ASC")
 	search := "error"
+	containerName := "api-server"
 	projectUID := "proj-1"
 	envUID := "env-1"
 	compUID := "comp-1"
 	logLevels := []gen.LogsQueryRequestLogLevels{"ERROR", "WARN"}
 
 	req := &gen.LogsQueryRequest{
-		StartTime:    startTime,
-		EndTime:      endTime,
-		Limit:        &limit,
-		SortOrder:    &sortOrder,
-		SearchPhrase: &search,
-		LogLevels:    &logLevels,
+		StartTime:     startTime,
+		EndTime:       endTime,
+		Limit:         &limit,
+		SortOrder:     &sortOrder,
+		SearchPhrase:  &search,
+		ContainerName: &containerName,
+		LogLevels:     &logLevels,
 	}
 	scope := &gen.ComponentSearchScope{
 		Namespace:      "test-ns",
@@ -247,6 +249,9 @@ func TestToComponentLogsParams(t *testing.T) {
 	if params.SearchPhrase != "error" {
 		t.Errorf("expected searchPhrase 'error', got %q", params.SearchPhrase)
 	}
+	if params.ContainerName != containerName {
+		t.Errorf("expected containerName %q, got %q", containerName, params.ContainerName)
+	}
 	if len(params.LogLevels) != 2 {
 		t.Errorf("expected 2 logLevels, got %d", len(params.LogLevels))
 	}
@@ -256,10 +261,12 @@ func TestToWorkflowLogsParams(t *testing.T) {
 	startTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	endTime := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
 	workflowRunName := "run-1"
+	containerName := "worker"
 
 	req := &gen.LogsQueryRequest{
-		StartTime: startTime,
-		EndTime:   endTime,
+		StartTime:     startTime,
+		EndTime:       endTime,
+		ContainerName: &containerName,
 	}
 	scope := &gen.WorkflowSearchScope{
 		Namespace:       "test-ns",
@@ -273,6 +280,9 @@ func TestToWorkflowLogsParams(t *testing.T) {
 	}
 	if params.WorkflowRunName != "run-1" {
 		t.Errorf("expected workflowRunName 'run-1', got %q", params.WorkflowRunName)
+	}
+	if params.ContainerName != containerName {
+		t.Errorf("expected containerName %q, got %q", containerName, params.ContainerName)
 	}
 	if !params.StartTime.Equal(startTime) {
 		t.Errorf("expected startTime %v, got %v", startTime, params.StartTime)
@@ -311,11 +321,11 @@ func TestToLogAlertParams(t *testing.T) {
 			Query: query,
 		},
 		Condition: struct {
-			Enabled   bool                                 `json:"enabled"`
-			Interval  string                               `json:"interval"`
+			Enabled   bool                                  `json:"enabled"`
+			Interval  string                                `json:"interval"`
 			Operator  gen.AlertRuleRequestConditionOperator `json:"operator"`
-			Threshold float32                              `json:"threshold"`
-			Window    string                               `json:"window"`
+			Threshold float32                               `json:"threshold"`
+			Window    string                                `json:"window"`
 		}{
 			Enabled:   enabled,
 			Operator:  operator,
@@ -588,11 +598,11 @@ func TestCreateAlertRule_Success(t *testing.T) {
 				Query: "error",
 			},
 			Condition: struct {
-				Enabled   bool                                 `json:"enabled"`
-				Interval  string                               `json:"interval"`
+				Enabled   bool                                  `json:"enabled"`
+				Interval  string                                `json:"interval"`
 				Operator  gen.AlertRuleRequestConditionOperator `json:"operator"`
-				Threshold float32                              `json:"threshold"`
-				Window    string                               `json:"window"`
+				Threshold float32                               `json:"threshold"`
+				Window    string                                `json:"window"`
 			}{
 				Enabled:   enabled,
 				Operator:  operator,
@@ -776,11 +786,11 @@ func TestUpdateAlertRule_Success(t *testing.T) {
 				Query: "error",
 			},
 			Condition: struct {
-				Enabled   bool                                 `json:"enabled"`
-				Interval  string                               `json:"interval"`
+				Enabled   bool                                  `json:"enabled"`
+				Interval  string                                `json:"interval"`
 				Operator  gen.AlertRuleRequestConditionOperator `json:"operator"`
-				Threshold float32                              `json:"threshold"`
-				Window    string                               `json:"window"`
+				Threshold float32                               `json:"threshold"`
+				Window    string                                `json:"window"`
 			}{
 				Enabled:   enabled,
 				Operator:  operator,
@@ -823,11 +833,11 @@ func TestUpdateAlertRule_NotFound(t *testing.T) {
 		RuleName: "nonexistent",
 		Body: &gen.AlertRuleRequest{
 			Condition: struct {
-				Enabled   bool                                 `json:"enabled"`
-				Interval  string                               `json:"interval"`
+				Enabled   bool                                  `json:"enabled"`
+				Interval  string                                `json:"interval"`
 				Operator  gen.AlertRuleRequestConditionOperator `json:"operator"`
-				Threshold float32                              `json:"threshold"`
-				Window    string                               `json:"window"`
+				Threshold float32                               `json:"threshold"`
+				Window    string                                `json:"window"`
 			}{
 				Enabled:   enabled,
 				Operator:  operator,
@@ -876,11 +886,11 @@ func TestUpdateAlertRule_InvalidError(t *testing.T) {
 		RuleName: "test-alert",
 		Body: &gen.AlertRuleRequest{
 			Condition: struct {
-				Enabled   bool                                 `json:"enabled"`
-				Interval  string                               `json:"interval"`
+				Enabled   bool                                  `json:"enabled"`
+				Interval  string                                `json:"interval"`
 				Operator  gen.AlertRuleRequestConditionOperator `json:"operator"`
-				Threshold float32                              `json:"threshold"`
-				Window    string                               `json:"window"`
+				Threshold float32                               `json:"threshold"`
+				Window    string                                `json:"window"`
 			}{
 				Enabled:   enabled,
 				Operator:  operator,
@@ -927,11 +937,11 @@ func TestUpdateAlertRule_GenericError(t *testing.T) {
 		RuleName: "test-alert",
 		Body: &gen.AlertRuleRequest{
 			Condition: struct {
-				Enabled   bool                                 `json:"enabled"`
-				Interval  string                               `json:"interval"`
+				Enabled   bool                                  `json:"enabled"`
+				Interval  string                                `json:"interval"`
 				Operator  gen.AlertRuleRequestConditionOperator `json:"operator"`
-				Threshold float32                              `json:"threshold"`
-				Window    string                               `json:"window"`
+				Threshold float32                               `json:"threshold"`
+				Window    string                                `json:"window"`
 			}{
 				Enabled:   enabled,
 				Operator:  operator,
@@ -1148,11 +1158,11 @@ func TestCreateAlertRule_Error(t *testing.T) {
 				Query: "error",
 			},
 			Condition: struct {
-				Enabled   bool                                 `json:"enabled"`
-				Interval  string                               `json:"interval"`
+				Enabled   bool                                  `json:"enabled"`
+				Interval  string                                `json:"interval"`
 				Operator  gen.AlertRuleRequestConditionOperator `json:"operator"`
-				Threshold float32                              `json:"threshold"`
-				Window    string                               `json:"window"`
+				Threshold float32                               `json:"threshold"`
+				Window    string                                `json:"window"`
 			}{
 				Enabled:   enabled,
 				Operator:  operator,
@@ -1338,8 +1348,21 @@ func TestToWorkflowLogsParams_NilOptionals(t *testing.T) {
 	if params.SearchPhrase != "" {
 		t.Errorf("expected empty searchPhrase, got %q", params.SearchPhrase)
 	}
+	if params.ContainerName != "" {
+		t.Errorf("expected empty containerName, got %q", params.ContainerName)
+	}
 	if params.LogLevels != nil {
 		t.Errorf("expected nil logLevels, got %v", params.LogLevels)
+	}
+}
+
+func TestToComponentLogsParams_NilContainerName(t *testing.T) {
+	params := toComponentLogsParams(
+		&gen.LogsQueryRequest{},
+		&gen.ComponentSearchScope{Namespace: "test-ns"},
+	)
+	if params.ContainerName != "" {
+		t.Errorf("expected empty containerName, got %q", params.ContainerName)
 	}
 }
 
@@ -1394,8 +1417,8 @@ func TestHandleAlertWebhook_ValidBody(t *testing.T) {
 
 	alertTime := float64(time.Now().UnixMicro())
 	body := &map[string]interface{}{
-		"alertName":                   "test-alert",
-		"alertCount":                  float64(3),
+		"alertName":                    "test-alert",
+		"alertCount":                   float64(3),
 		"alertTriggerTimeMicroSeconds": alertTime,
 	}
 

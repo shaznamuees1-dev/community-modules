@@ -185,6 +185,90 @@ func testLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 }
 
+func querySQL(t *testing.T, queryJSON []byte) string {
+	t.Helper()
+	var query struct {
+		Query struct {
+			SQL string `json:"sql"`
+		} `json:"query"`
+	}
+	if err := json.Unmarshal(queryJSON, &query); err != nil {
+		t.Fatalf("invalid query JSON: %v", err)
+	}
+	if query.Query.SQL == "" {
+		t.Fatal("query JSON has no SQL")
+	}
+	return query.Query.SQL
+}
+
+func TestLogQueriesContainerName(t *testing.T) {
+	tests := []struct {
+		name          string
+		containerName string
+		wantCondition string
+	}{
+		{name: "omitted"},
+		{name: "provided", containerName: "api-server", wantCondition: "kubernetes_container_name = 'api-server'"},
+		{
+			name:          "escaped special characters",
+			containerName: `side'car\main`,
+			wantCondition: `kubernetes_container_name = 'side''car\\main'`,
+		},
+		{
+			name:          "other SQL metacharacters remain literal",
+			containerName: `worker%;-- "api"`,
+			wantCondition: `kubernetes_container_name = 'worker%;-- "api"'`,
+		},
+	}
+
+	for _, scope := range []string{"component", "workflow"} {
+		t.Run(scope, func(t *testing.T) {
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					var resultQuery, countQuery []byte
+					var err error
+					switch scope {
+					case "component":
+						params := ComponentLogsParams{
+							Namespace:     "test-ns",
+							ContainerName: tt.containerName,
+						}
+						resultQuery, err = generateComponentLogsQuery(params, "mystream", testLogger())
+						if err == nil {
+							countQuery, err = generateComponentLogsCountQuery(params, "mystream", testLogger())
+						}
+					case "workflow":
+						params := WorkflowLogsParams{
+							Namespace:     "test-ns",
+							ContainerName: tt.containerName,
+						}
+						resultQuery, err = generateWorkflowLogsQuery(params, "mystream", testLogger())
+						if err == nil {
+							countQuery, err = generateWorkflowLogsCountQuery(params, "mystream", testLogger())
+						}
+					}
+					if err != nil {
+						t.Fatalf("failed to generate query: %v", err)
+					}
+
+					for _, queryJSON := range [][]byte{resultQuery, countQuery} {
+						sql := querySQL(t, queryJSON)
+						if tt.wantCondition == "" {
+							if strings.Contains(sql, colContainerName+" =") {
+								t.Errorf("unexpected container-name condition in SQL: %s", sql)
+							}
+							continue
+						}
+						if !strings.Contains(sql, tt.wantCondition) {
+							t.Errorf("SQL missing container-name condition %q: %s", tt.wantCondition, sql)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestGenerateComponentLogsQuery(t *testing.T) {
 	startTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	endTime := time.Date(2025, 1, 2, 0, 0, 0, 0, time.UTC)
@@ -232,16 +316,16 @@ func TestGenerateComponentLogsQuery(t *testing.T) {
 
 	t.Run("with all filters", func(t *testing.T) {
 		params := ComponentLogsParams{
-			Namespace:    "test-ns",
-			ProjectID:    "proj-1",
+			Namespace:     "test-ns",
+			ProjectID:     "proj-1",
 			EnvironmentID: "env-1",
-			ComponentIDs: []string{"comp-1", "comp-2"},
-			SearchPhrase: "error",
-			LogLevels:    []string{"ERROR", "WARN"},
-			Limit:        50,
-			SortOrder:    "ASC",
-			StartTime:    startTime,
-			EndTime:      endTime,
+			ComponentIDs:  []string{"comp-1", "comp-2"},
+			SearchPhrase:  "error",
+			LogLevels:     []string{"ERROR", "WARN"},
+			Limit:         50,
+			SortOrder:     "ASC",
+			StartTime:     startTime,
+			EndTime:       endTime,
 		}
 
 		result, err := generateComponentLogsQuery(params, "mystream", testLogger())
